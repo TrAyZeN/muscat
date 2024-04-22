@@ -1,10 +1,7 @@
 use crate::util::max_per_row;
 use ndarray::{concatenate, s, Array1, Array2, ArrayView1, ArrayView2, Axis};
-use rayon::{
-    iter::ParallelBridge,
-    prelude::{IntoParallelIterator, ParallelIterator},
-};
-use std::{iter::zip, ops::Add};
+use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use std::ops::Add;
 
 /// Computes the [`Cpa`] of the given traces.
 ///
@@ -25,24 +22,22 @@ where
     assert_eq!(leakages.shape()[0], plaintexts.shape()[0]);
     assert!(chunk_size > 0);
 
-    let mut cpa = zip(
-        leakages.axis_chunks_iter(Axis(0), chunk_size),
-        plaintexts.axis_chunks_iter(Axis(0), chunk_size),
-    )
-    .par_bridge()
-    .map(|(leakages_chunk, plaintexts_chunk)| {
-        let mut cpa = Cpa::new(leakages.shape()[1], guess_range, target_byte, leakage_func);
+    let mut cpa = (0..leakages.shape()[0])
+        .into_par_iter()
+        .step_by(chunk_size)
+        .map(|chunk_start| {
+            let mut cpa = Cpa::new(leakages.shape()[1], guess_range, target_byte, leakage_func);
 
-        for i in 0..leakages_chunk.shape()[0] {
-            cpa.update(leakages_chunk.row(i), plaintexts_chunk.row(i));
-        }
+            for i in chunk_start..(chunk_start + chunk_size) {
+                cpa.update(leakages.row(i), plaintexts.row(i));
+            }
 
-        cpa
-    })
-    .reduce(
-        || Cpa::new(leakages.shape()[1], guess_range, target_byte, leakage_func),
-        |a: Cpa, b| a + b,
-    );
+            cpa
+        })
+        .reduce(
+            || Cpa::new(leakages.shape()[1], guess_range, target_byte, leakage_func),
+            |a: Cpa, b| a + b,
+        );
 
     cpa.finalize();
 
