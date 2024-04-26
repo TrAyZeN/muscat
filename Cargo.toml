@@ -40,3 +40,7 @@ harness = false
 [[bench]]
 name = "dpa"
 harness = false
+
+[[bench]]
+name = "helper"
+harness = false
