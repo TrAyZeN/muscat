@@ -20,7 +20,12 @@ impl MeanVar {
     /// # Arguments
     ///
     /// * `size` - Number of samples per trace
+    ///
+    /// # Panics
+    /// Panics if `size` is not strictly positive.
     pub fn new(size: usize) -> Self {
+        assert!(size > 0);
+
         Self {
             sum: Array1::zeros(size),
             sum_squares: Array1::zeros(size),
@@ -28,11 +33,16 @@ impl MeanVar {
         }
     }
 
-    /// Processes an input trace to update internal accumulators.
+    /// Processes a trace to update internal accumulators.
+    ///
+    /// The number of samples of traces MUST equal the accumulator length.
     ///
     /// # Panics
-    /// Panics in debug if the length of the trace is different form the size of [`MeanVar`].
-    pub fn process<T: Into<i64> + Copy>(&mut self, trace: ArrayView1<T>) {
+    /// Panics in debug if the number of samples of the given trace is different from the accumulator length.
+    pub fn process<T>(&mut self, trace: ArrayView1<T>)
+    where
+        T: Into<i64> + Copy,
+    {
         debug_assert!(trace.len() == self.sum.len());
 
         for i in 0..self.sum.len() {
@@ -45,14 +55,39 @@ impl MeanVar {
         self.count += 1;
     }
 
-    /// Returns trace mean.
+    /// Processes a batch of traces to update internal accumulators.
+    ///
+    /// The number of samples of traces MUST equal the accumulator length.
+    ///
+    /// # Panics
+    /// Panics in debug if the number of samples of the given traces is different from the
+    /// accumulator length.
+    pub fn process_batch<T>(&mut self, trace_batch: ArrayView2<T>)
+    where
+        T: Into<i64> + Copy,
+    {
+        debug_assert!(trace_batch.shape()[1] == self.sum.len());
+
+        for i in 0..trace_batch.shape()[0] {
+            for j in 0..trace_batch.shape()[1] {
+                let x = trace_batch[[i, j]].into();
+
+                self.sum[j] += x;
+                self.sum_squares[j] += x * x;
+            }
+        }
+
+        self.count += trace_batch.shape()[0];
+    }
+
+    /// Computes the mean of the processed traces.
     pub fn mean(&self) -> Array1<f64> {
         let count = self.count as f64;
 
         self.sum.map(|&x| x as f64 / count)
     }
 
-    /// Calculates and returns traces variance.
+    /// Computes the variance of the processed traces.
     pub fn var(&self) -> Array1<f64> {
         let count = self.count as f64;
 
@@ -61,7 +96,7 @@ impl MeanVar {
             .collect()
     }
 
-    /// Returns the number of traces processed.
+    /// Returns the number of processed traces.
     pub fn count(&self) -> usize {
         self.count
     }
@@ -84,30 +119,34 @@ impl Add for MeanVar {
 /// `get_class` is a function returning the class of the given trace by index.
 ///
 /// # Panics
-/// Panic if `chunk_size` is 0.
+/// Panic if `batch_size` is not strictly positive.
 pub fn snr<T, F>(
     leakages: ArrayView2<T>,
     classes: usize,
     get_class: F,
-    chunk_size: usize,
+    batch_size: usize,
 ) -> Array1<f64>
 where
     T: Into<i64> + Copy + Sync,
     F: Fn(usize) -> usize + Sync,
 {
-    assert!(chunk_size > 0);
+    assert!(batch_size > 0);
 
     // From benchmarks fold + reduce_with is faster than map + reduce/reduce_with and fold + reduce
     leakages
-        .axis_chunks_iter(Axis(0), chunk_size)
+        .axis_chunks_iter(Axis(0), batch_size)
         .enumerate()
         .par_bridge()
         .fold(
             || Snr::new(leakages.shape()[1], classes),
-            |mut snr, (chunk_idx, leakages_chunk)| {
-                for i in 0..leakages_chunk.shape()[0] {
-                    snr.process(leakages_chunk.row(i), get_class(chunk_idx + i));
+            |mut snr, (batch_idx, leakages_batch)| {
+                let mut class_batch = Array1::zeros(leakages_batch.shape()[0]);
+                for i in 0..leakages_batch.shape()[0] {
+                    class_batch[i] = get_class(batch_idx + i);
                 }
+
+                snr.process_batch(leakages_batch, class_batch.view());
+
                 snr
             },
         )
@@ -116,7 +155,7 @@ where
         .snr()
 }
 
-/// Processes traces to calculate the Signal-to-Noise Ratio.
+/// Processes traces to compute the Signal-to-Noise Ratio.
 #[derive(Clone)]
 pub struct Snr {
     mean_var: MeanVar,
@@ -133,7 +172,13 @@ impl Snr {
     ///
     /// * `size` - Size of the input traces
     /// * `classes` - Number of classes
+    ///
+    /// # Panics
+    /// Panic of `size` or `classes` is not strictly positive.
     pub fn new(size: usize, classes: usize) -> Self {
+        assert!(size > 0);
+        assert!(classes > 0);
+
         Self {
             mean_var: MeanVar::new(size),
             classes_sum: Array2::zeros((classes, size)),
@@ -141,11 +186,15 @@ impl Snr {
         }
     }
 
-    /// Processes an input trace to update internal accumulators.
+    /// Processes a trace to update internal accumulators.
     ///
     /// # Panics
-    /// Panics in debug if the length of the trace is different from the size of [`Snr`].
-    pub fn process<T: Into<i64> + Copy>(&mut self, trace: ArrayView1<T>, class: usize) {
+    /// Panics in debug if the number of samples of the given trace is different from the size of
+    /// [`Snr`].
+    pub fn process<T>(&mut self, trace: ArrayView1<T>, class: usize)
+    where
+        T: Into<i64> + Copy,
+    {
         debug_assert!(trace.len() == self.classes_sum.shape()[1]);
 
         self.mean_var.process(trace);
@@ -155,6 +204,33 @@ impl Snr {
         }
 
         self.classes_count[class] += 1;
+    }
+
+    /// Processes a batch of traces to update internal accumulators.
+    ///
+    /// # Panics
+    /// - Panics in debug if the number of samples of the given traces is different from the size
+    /// of [`Snr`].
+    /// - Panics in debug if the size of the batch of traces is different from the size of the
+    /// batch of classes.
+    pub fn process_batch<T>(&mut self, trace_batch: ArrayView2<T>, class_batch: ArrayView1<usize>)
+    where
+        T: Into<i64> + Copy,
+    {
+        debug_assert_eq!(trace_batch.shape()[1], self.classes_sum.shape()[1]);
+        debug_assert_eq!(trace_batch.shape()[0], class_batch.shape()[0]);
+
+        self.mean_var.process_batch(trace_batch);
+
+        for row in 0..trace_batch.shape()[0] {
+            let class = class_batch[row];
+
+            for i in 0..self.classes_sum.shape()[1] {
+                self.classes_sum[[class, i]] += trace_batch[[row, i]].into();
+            }
+
+            self.classes_count[class] += 1;
+        }
     }
 
     /// Returns Signal-to-Noise Ratio of the traces.
@@ -223,7 +299,10 @@ impl TTest {
     ///
     /// # Panics
     /// Panics in debug if `trace.len() != self.mean_var_1.sum.len()`.
-    pub fn process<T: Into<i64> + Copy>(&mut self, trace: ArrayView1<T>, class: bool) {
+    pub fn process<T>(&mut self, trace: ArrayView1<T>, class: bool)
+    where
+        T: Into<i64> + Copy,
+    {
         debug_assert!(trace.len() == self.mean_var_1.sum.len());
 
         if class {

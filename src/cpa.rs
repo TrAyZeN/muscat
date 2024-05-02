@@ -10,33 +10,31 @@ use std::{iter::zip, ops::Add};
 ///
 /// # Panics
 /// - Panic if `leakages.shape()[0] != plaintexts.shape()[0]`
-/// - Panic if `chunk_size` is 0.
+/// - Panic if `batch_size` is not strictly positive.
 pub fn cpa<T>(
     leakages: ArrayView2<T>,
     plaintexts: ArrayView2<T>,
     guess_range: usize,
     target_byte: usize,
     leakage_func: fn(usize, usize) -> usize,
-    chunk_size: usize,
+    batch_size: usize,
 ) -> Cpa
 where
     T: Into<usize> + Copy + Sync,
 {
     assert_eq!(leakages.shape()[0], plaintexts.shape()[0]);
-    assert!(chunk_size > 0);
+    assert!(batch_size > 0);
 
     // From benchmarks fold + reduce_with is faster than map + reduce/reduce_with and fold + reduce
     zip(
-        leakages.axis_chunks_iter(Axis(0), chunk_size),
-        plaintexts.axis_chunks_iter(Axis(0), chunk_size),
+        leakages.axis_chunks_iter(Axis(0), batch_size),
+        plaintexts.axis_chunks_iter(Axis(0), batch_size),
     )
     .par_bridge()
     .fold(
         || CpaProcessor::new(leakages.shape()[1], guess_range, target_byte, leakage_func),
-        |mut cpa, (leakages_chunk, plaintexts_chunk)| {
-            for i in 0..leakages_chunk.shape()[0] {
-                cpa.update(leakages_chunk.row(i), plaintexts_chunk.row(i));
-            }
+        |mut cpa, (leakages_batch, plaintexts_batch)| {
+            cpa.update_batch(leakages_batch, plaintexts_batch);
 
             cpa
         },
@@ -103,12 +101,16 @@ pub struct CpaProcessor {
 
 /* This class implements the CPA shown in this paper: https://eprint.iacr.org/2013/794.pdf */
 impl CpaProcessor {
+    /// # Panics
+    /// Panics if `size` is not strictly positive.
     pub fn new(
         size: usize,
         guess_range: usize,
         target_byte: usize,
         leakage_func: fn(usize, usize) -> usize,
     ) -> Self {
+        assert!(size > 0);
+
         Self {
             len_samples: size,
             target_byte,
@@ -123,8 +125,11 @@ impl CpaProcessor {
         }
     }
 
+    /// Processes a trace to update internal accumulators.
+    ///
     /// # Panics
-    /// Panic in debug if `trace.shape()[0] != self.len_samples`.
+    /// - Panics in debug if the number of samples of the given trace is different from
+    /// `self.len_samples`.
     pub fn update<T>(&mut self, trace: ArrayView1<T>, plaintext: ArrayView1<T>)
     where
         T: Into<usize> + Copy,
@@ -151,6 +156,46 @@ impl CpaProcessor {
         }
 
         self.len_leakages += 1;
+    }
+
+    /// Processes a batch of traces to update internal accumulators.
+    ///
+    /// # Panics
+    /// - Panics in debug if the number of samples of the given traces is different from
+    /// `self.len_samples`.
+    /// - Panics in debug if the size of the batch of traces is different from the size of the
+    /// batch of plaintexts.
+    pub fn update_batch<T>(&mut self, trace_batch: ArrayView2<T>, plaintext_batch: ArrayView2<T>)
+    where
+        T: Into<usize> + Copy,
+    {
+        debug_assert_eq!(trace_batch.shape()[0], plaintext_batch.shape()[0]);
+        debug_assert_eq!(trace_batch.shape()[1], self.len_samples);
+
+        /* This function updates the main arrays of the CPA, as shown in Alg. 4
+        in the paper.*/
+
+        for i in 0..trace_batch.shape()[0] {
+            for j in 0..self.len_samples {
+                self.sum_leakages[j] += trace_batch[[i, j]].into();
+                self.sum_squares_leakages[j] +=
+                    trace_batch[[i, j]].into() * trace_batch[[i, j]].into();
+            }
+
+            for guess in 0..self.guess_range {
+                let value =
+                    (self.leakage_func)(plaintext_batch[[i, self.target_byte]].into(), guess);
+                self.guess_sum_leakages[guess] += value;
+                self.guess_sum_squares_leakages[guess] += value * value;
+            }
+
+            let partition = plaintext_batch[[i, self.target_byte]].into();
+            for j in 0..self.len_samples {
+                self.a_l[[partition, j]] += trace_batch[[i, j]].into();
+            }
+        }
+
+        self.len_leakages += trace_batch.shape()[0];
     }
 
     pub fn finalize(&self) -> Cpa {
