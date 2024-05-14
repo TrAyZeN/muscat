@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use codspeed_criterion_compat::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use muscat::dpa::{dpa, Dpa, DpaProcessor};
 use muscat::leakage::sbox;
 use ndarray::{Array1, Array2};

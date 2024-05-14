@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use codspeed_criterion_compat::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use muscat::cpa::{self, Cpa, CpaProcessor};
 use muscat::cpa_normal;
 use muscat::leakage::{hw, sbox};
