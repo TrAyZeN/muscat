@@ -15,7 +15,7 @@ jobs:
     - name: Install cargo-codspeed
       run: cargo install cargo-codspeed
     - name: Run the benchmarks
-        uses: CodSpeedHQ/action@v2
-        with:
-          run: cargo codspeed run
-          token: ${{ secrets.CODSPEED_TOKEN }}
+      uses: CodSpeedHQ/action@v2
+      with:
+        run: cargo codspeed run
+        token: ${{ secrets.CODSPEED_TOKEN }}
