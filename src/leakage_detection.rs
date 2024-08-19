@@ -240,6 +240,205 @@ where
     }
 }
 
+/// Computes the NICV of the given traces using [`NicvProcessor`].
+///
+/// `get_class` is a function returning the class of the given trace by index.
+///
+/// # Examples
+/// ```
+/// use muscat::leakage_detection::nicv;
+/// use ndarray::array;
+///
+/// let traces = array![
+///     [77, 137, 51, 91],
+///     [72, 61, 91, 83],
+///     [39, 49, 52, 23],
+///     [26, 114, 63, 45],
+///     [30, 8, 97, 91],
+///     [13, 68, 7, 45],
+///     [17, 181, 60, 34],
+///     [43, 88, 76, 78],
+///     [0, 36, 35, 0],
+///     [93, 191, 49, 26],
+/// ];
+/// let plaintexts = array![
+///     [1usize, 2],
+///     [2, 1],
+///     [1, 2],
+///     [1, 2],
+///     [2, 1],
+///     [2, 1],
+///     [1, 2],
+///     [1, 2],
+///     [2, 1],
+///     [2, 1],
+/// ];
+/// let nicv = nicv(traces.view(), 256, |i| plaintexts.row(i)[0].into(), 2);
+/// ```
+///
+/// # Panics
+/// - Panic if `traces.shape()[0] != trace_classes.shape()[0]`
+/// - Panic if `batch_size` is 0.
+pub fn nicv<T, F>(
+    traces: ArrayView2<T>,
+    classes: usize,
+    get_class: F,
+    batch_size: usize,
+) -> Array1<f32>
+where
+    T: Sample + Copy + Sync,
+    <T as Sample>::Container: Send,
+    F: Fn(usize) -> usize + Sync,
+{
+    assert!(batch_size > 0);
+
+    // From benchmarks fold + reduce_with is faster than map + reduce/reduce_with and fold + reduce
+    traces
+        .axis_chunks_iter(Axis(0), batch_size)
+        .enumerate()
+        .par_bridge()
+        .fold(
+            || NicvProcessor::new(traces.shape()[1], classes),
+            |mut nicv, (batch_idx, trace_batch)| {
+                for i in 0..trace_batch.shape()[0] {
+                    nicv.process(trace_batch.row(i), get_class(batch_idx + i));
+                }
+                nicv
+            },
+        )
+        .reduce_with(|a, b| a + b)
+        .unwrap()
+        .nicv()
+}
+
+/// Processes traces to calculate the Normalized Inter-Class Variance [^1].
+///
+/// [^1]: <https://eprint.iacr.org/2014/1020.pdf>
+#[derive(Serialize, Deserialize)]
+pub struct NicvProcessor<T>
+where
+    T: Sample,
+{
+    #[serde(bound(serialize = "<T as Sample>::Container: Serialize"))]
+    #[serde(bound(deserialize = "<T as Sample>::Container: Deserialize<'de>"))]
+    mean_var: MeanVar<T>,
+    /// Sum of traces per class
+    #[serde(bound(serialize = "<T as Sample>::Container: Serialize"))]
+    #[serde(bound(deserialize = "<T as Sample>::Container: Deserialize<'de>"))]
+    classes_sum: Array2<<T as Sample>::Container>,
+    /// Counts the number of traces per class
+    classes_count: Array1<usize>,
+}
+
+impl<T> NicvProcessor<T>
+where
+    T: Sample + Copy,
+{
+    /// Creates a new NICV processor.
+    ///
+    /// # Arguments
+    ///
+    /// * `size` - Size of the input traces
+    /// * `classes` - Number of classes
+    pub fn new(size: usize, num_classes: usize) -> Self {
+        Self {
+            mean_var: MeanVar::new(size),
+            classes_sum: Array2::zeros((num_classes, size)),
+            classes_count: Array1::zeros(num_classes),
+        }
+    }
+
+    /// Processes an input trace to update internal accumulators.
+    ///
+    /// # Panics
+    /// Panics in debug if the length of the trace is different from the size of [`Snr`].
+    pub fn process(&mut self, trace: ArrayView1<T>, class: usize) {
+        debug_assert!(trace.len() == self.size());
+        debug_assert!(class < self.num_classes());
+
+        self.mean_var.process(trace);
+
+        for i in 0..self.size() {
+            self.classes_sum[[class, i]] += trace[i].into();
+        }
+
+        self.classes_count[class] += 1;
+    }
+
+    /// Finalize the processor computation and return the  Normalized Inter-Class Variance of the traces.
+    pub fn nicv(&self) -> Array1<f32> {
+        // NICV = V[E[L|X]] / V[L]
+
+        let mut sum_classes_mean: Array1<f32> = Array1::zeros(self.size());
+        // sum of E[L|X]^2 to compute E[E[L|X]^2] after
+        let mut sum_squares_classes_mean = Array1::zeros(self.size());
+        let mut acc = Array1::zeros(self.size());
+        for class in 0..self.num_classes() {
+            if self.classes_count[class] == 0 {
+                continue;
+            }
+
+            let class_sum = self.classes_sum.row(class);
+            sum_classes_mean += &class_sum.mapv(|x| x.as_() / self.classes_count[class] as f32);
+            sum_squares_classes_mean +=
+                &class_sum.mapv(|x| (x.as_() / self.classes_count[class] as f32).powi(2));
+            acc += &class_sum.mapv(|x| x.as_().powi(2) / self.classes_count[class] as f32);
+        }
+
+        // V[E[L|X]] = E[E[L|X]^2] - E[E[L|X]]^2
+        // However, from law of total expectation: E[E[L|X]] = E[L]
+        // Thus, V[E[L|X]] = E[E[L|X]^2] - E[L]^2
+        // WARN: For some reason it does not yield the same result
+        //let velx = (sum_squares_classes_mean / self.num_classes() as f32)
+        //- (sum_classes_mean / self.num_classes() as f32).mapv(|x: f32| x.powi(2));
+        //let velx = (sum_squares_classes_mean / self.num_classes() as f32)
+        //- self.mean_var.mean().mapv(|x| x.powi(2));
+        let velx = (acc / self.mean_var.count() as f32) - self.mean_var.mean().mapv(|x| x.powi(2));
+
+        velx / self.mean_var.var()
+    }
+
+    /// Returns the trace size handled
+    pub fn size(&self) -> usize {
+        self.classes_sum.shape()[1]
+    }
+
+    /// Returns the number of classes handled.
+    pub fn num_classes(&self) -> usize {
+        self.classes_count.len()
+    }
+
+    /// Determine if two [`NicvProcessor`] are compatible for addition.
+    ///
+    /// If they were created with the same parameters, they are compatible.
+    fn is_compatible_with(&self, other: &Self) -> bool {
+        self.size() == other.size() && self.num_classes() == other.num_classes()
+    }
+}
+
+impl<T> Add for NicvProcessor<T>
+where
+    T: Sample + Copy,
+{
+    type Output = Self;
+
+    /// Merge computations of two [`NicvProcessor`]. Processors need to be compatible to be merged
+    /// together, otherwise it can panic or yield incoherent result (see
+    /// [`NicvProcessor::is_compatible_with`]).
+    ///
+    /// # Panics
+    /// Panics in debug if the processors are not compatible.
+    fn add(self, rhs: Self) -> Self::Output {
+        debug_assert!(self.is_compatible_with(&rhs));
+
+        Self {
+            mean_var: self.mean_var + rhs.mean_var,
+            classes_sum: self.classes_sum + rhs.classes_sum,
+            classes_count: self.classes_count + rhs.classes_count,
+        }
+    }
+}
+
 /// Compute the Welch's T-test of the given traces using [`TTestProcessor`].
 ///
 /// # Examples
