@@ -83,30 +83,36 @@ impl Snr {
     }
 
     /// Returns the Signal-to-Noise Ratio of the traces.
+    ///
     /// SNR = V[E[L|X]] / E[V[L|X]]
     pub fn snr(&self) -> Array1<f64> {
-        let size = self.size();
-
-        let mut acc: Array1<f64> = Array1::zeros(size);
+        let mut acc = Array1::zeros(self.size());
         for class in 0..self.num_classes() {
             if self.classes_count[class] == 0 {
                 continue;
             }
 
-            let class_sum = self.classes_sum.slice(s![class, ..]);
-            for i in 0..size {
-                acc[i] += (class_sum[i] as f64).powi(2) / (self.classes_count[class] as f64);
-            }
+            acc += &self
+                .classes_sum
+                .row(class)
+                .mapv(|x| (x as f64).powi(2) / self.classes_count[class] as f64);
         }
 
-        let var = self.mean_var.var();
-        let mean = self.mean_var.mean();
-        // V[E[L|X]]
-        let velx = (acc / self.mean_var.count() as f64) - mean.mapv(|x| x.powi(2));
-        1f64 / (var / velx - 1f64)
+        // V[E[L|X]] = E[E[L|X]^2] - E[E[L|X]]^2
+        // However, from law of total expectation: E[E[L|X]] = E[L]
+        // Thus, V[E[L|X]] = E[E[L|X]^2] - E[L]^2
+        // NOTE: As of today (rustc 1.80), implementing the following operations in a loop instead
+        // of using ndarray operators yields smaller code but same perfs.
+        let velx = (acc / self.mean_var.count() as f64) - self.mean_var.mean().mapv(|x| x.powi(2));
+
+        // From the law of total variance, V[L] = E[V[L|X]] + V[E[L|X]].
+        // Thus, the SNR can be computed as SNR = V[E[L|X]] / (V[L] - V[E[L|X]])
+        // The computation does not use V[E[L|X]], reducing the number of operations.
+        // NOTE: As of today (rustc 1.80), the clone gets optimized.
+        velx.clone() / (self.mean_var.var() - velx)
     }
 
-    /// Returns the trace size handled
+    /// Returns the trace size handled.
     pub fn size(&self) -> usize {
         self.classes_sum.shape()[1]
     }
