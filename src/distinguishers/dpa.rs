@@ -95,29 +95,29 @@ where
 /// [^1]: <https://paulkocher.com/doc/DifferentialPowerAnalysis.pdf>
 #[derive(Debug)]
 pub struct Dpa {
-    differential_curves: Array2<f32>,
+    differential_curves: Array2<f64>,
 }
 
 impl Dpa {
     /// Return the rank of guesses
     pub fn rank(&self) -> Array1<usize> {
-        let rank = argsort_by(&self.max_differential_curves().to_vec()[..], f32::total_cmp);
+        let rank = argsort_by(&self.max_differential_curves().to_vec()[..], f64::total_cmp);
 
         Array1::from_vec(rank)
     }
 
     /// Return the differential curves
-    pub fn differential_curves(&self) -> ArrayView2<'_, f32> {
+    pub fn differential_curves(&self) -> ArrayView2<'_, f64> {
         self.differential_curves.view()
     }
 
     /// Return the guess with the highest differential peak.
     pub fn best_guess(&self) -> usize {
-        argmax_by(self.max_differential_curves().view(), f32::total_cmp)
+        argmax_by(self.max_differential_curves().view(), f64::total_cmp)
     }
 
     /// Return the maximum differential peak for each guess.
-    pub fn max_differential_curves(&self) -> Array1<f32> {
+    pub fn max_differential_curves(&self) -> Array1<f64> {
         max_per_row(self.differential_curves.view())
     }
 }
@@ -218,10 +218,10 @@ where
         let mut differential_curves = Array2::zeros((self.guess_range, self.num_samples));
         for guess in 0..self.guess_range {
             for i in 0..self.num_samples {
-                let mean_0 = self.sum_0[[guess, i]].as_() / self.count_0[guess] as f32;
-                let mean_1 = self.sum_1[[guess, i]].as_() / self.count_1[guess] as f32;
+                let mean_0 = self.sum_0[[guess, i]].as_() / self.count_0[guess] as f64;
+                let mean_1 = self.sum_1[[guess, i]].as_() / self.count_1[guess] as f64;
 
-                differential_curves[[guess, i]] = f32::abs(mean_0 - mean_1);
+                differential_curves[[guess, i]] = f64::abs(mean_0 - mean_1);
             }
         }
 

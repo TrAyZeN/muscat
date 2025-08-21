@@ -30,7 +30,7 @@ pub trait Sample: Sized {
         + Add
         + AddAssign
         + Mul<Output = Self::Container>
-        + AsPrimitive<f32>
+        + AsPrimitive<f64>
         + Clone
         + Copy
         + From<Self>;
@@ -48,4 +48,4 @@ macro_rules! impl_sample {
 
 impl_sample! { u8, u16, u32, u64 => u64 }
 impl_sample! { i8, i16, i32, i64 => i64 }
-impl_sample! { f32 => f32 }
+impl_sample! { f32, f64 => f64 }

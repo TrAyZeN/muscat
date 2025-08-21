@@ -35,7 +35,7 @@ pub fn progress_bar(len: usize) -> ProgressBar {
 }
 
 /// Return an array where the i-th element contains the maximum of the i-th row of the input array.
-pub fn max_per_row(arr: ArrayView2<f32>) -> Array1<f32> {
+pub fn max_per_row(arr: ArrayView2<f64>) -> Array1<f64> {
     arr.axis_iter(Axis(0))
         .map(|row| {
             *row.into_iter()

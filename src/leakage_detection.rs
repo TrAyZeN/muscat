@@ -49,7 +49,7 @@ pub fn snr<T, F>(
     classes: usize,
     get_class: F,
     batch_size: usize,
-) -> Array1<f32>
+) -> Array1<f64>
 where
     T: Sample + Copy + Sync,
     <T as Sample>::Container: Send,
@@ -129,7 +129,7 @@ where
     }
 
     /// Finalize the processor computation and return the Signal-to-Noise Ratio.
-    pub fn snr(&self) -> Array1<f32> {
+    pub fn snr(&self) -> Array1<f64> {
         // SNR = V[E[L|X]] / E[V[L|X]]
 
         let mean = self.mean_var.mean();
@@ -146,10 +146,10 @@ where
             let class_mean = self
                 .classes_sum
                 .row(class)
-                .mapv(|x| x.as_() / class_count as f32);
+                .mapv(|x| x.as_() / class_count as f64);
 
-            velx += &((class_mean - &mean).mapv(|d| d * d) * class_count as f32
-                / self.mean_var.count() as f32);
+            velx += &((class_mean - &mean).mapv(|d| d * d) * class_count as f64
+                / self.mean_var.count() as f64);
         }
 
         let var = self.mean_var.var();
@@ -282,7 +282,7 @@ pub fn nicv<T, F>(
     classes: usize,
     get_class: F,
     batch_size: usize,
-) -> Array1<f32>
+) -> Array1<f64>
 where
     T: Sample + Copy + Sync,
     <T as Sample>::Container: Send,
@@ -364,7 +364,7 @@ where
     }
 
     /// Finalize the processor computation and return the  Normalized Inter-Class Variance of the traces.
-    pub fn nicv(&self) -> Array1<f32> {
+    pub fn nicv(&self) -> Array1<f64> {
         // NICV = V[E[L|X]] / V[L]
 
         let mean = self.mean_var.mean();
@@ -381,10 +381,10 @@ where
             let class_mean = self
                 .classes_sum
                 .row(class)
-                .mapv(|x| x.as_() / class_count as f32);
+                .mapv(|x| x.as_() / class_count as f64);
 
-            velx += &((class_mean - &mean).mapv(|d| d * d) * class_count as f32
-                / self.mean_var.count() as f32);
+            velx += &((class_mean - &mean).mapv(|d| d * d) * class_count as f64
+                / self.mean_var.count() as f64);
         }
 
         velx / self.mean_var.var()
@@ -462,7 +462,7 @@ pub fn ttest<T>(
     traces: ArrayView2<T>,
     trace_classes: ArrayView1<bool>,
     batch_size: usize,
-) -> Array1<f32>
+) -> Array1<f64>
 where
     T: Sample + Copy + Sync,
     <T as Sample>::Container: Send,
@@ -537,14 +537,14 @@ where
     }
 
     /// Calculate and return Welch's T-Test result.
-    pub fn ttest(&self) -> Array1<f32> {
+    pub fn ttest(&self) -> Array1<f64> {
         // E(X1) - E(X2)
         let q = self.mean_var_1.mean() - self.mean_var_2.mean();
 
         // √(σ1²/N1 + σ2²/N2)
-        let d = ((self.mean_var_1.var() / self.mean_var_1.count() as f32)
-            + (self.mean_var_2.var() / self.mean_var_2.count() as f32))
-            .mapv(f32::sqrt);
+        let d = ((self.mean_var_1.var() / self.mean_var_1.count() as f64)
+            + (self.mean_var_2.var() / self.mean_var_2.count() as f64))
+            .mapv(f64::sqrt);
         q / d
     }
 
@@ -669,7 +669,12 @@ mod tests {
 
         assert_eq!(
             processor.ttest(),
-            array![-1.0910345, -5.5249214, 0.29385296, 0.23308459]
+            array![
+                -1.0910344547297484,
+                -5.524921845887032,
+                0.29385284736362266,
+                0.23308466737856662
+            ]
         );
     }
 

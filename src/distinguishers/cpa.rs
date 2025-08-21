@@ -17,29 +17,29 @@ use std::{fmt::Debug, fs::File, iter::zip, ops::Add, path::Path};
 #[derive(Debug)]
 pub struct Cpa {
     /// Pearson correlation coefficients
-    pub(crate) corr: Array2<f32>,
+    pub(crate) corr: Array2<f64>,
 }
 
 impl Cpa {
     /// Rank guesses.
     pub fn rank(&self) -> Array1<usize> {
-        let rank = argsort_by(&self.max_corr().to_vec()[..], f32::total_cmp);
+        let rank = argsort_by(&self.max_corr().to_vec()[..], f64::total_cmp);
 
         Array1::from_vec(rank)
     }
 
     /// Return the Pearson correlation coefficients.
-    pub fn corr(&self) -> ArrayView2<'_, f32> {
+    pub fn corr(&self) -> ArrayView2<'_, f64> {
         self.corr.view()
     }
 
     /// Return the guess with the highest Pearson correlation coefficient.
     pub fn best_guess(&self) -> usize {
-        argmax_by(self.max_corr().view(), f32::total_cmp)
+        argmax_by(self.max_corr().view(), f64::total_cmp)
     }
 
     /// Return the maximum Pearson correlation coefficient for each guess.
-    pub fn max_corr(&self) -> Array1<f32> {
+    pub fn max_corr(&self) -> Array1<f64> {
         max_per_row(self.corr.view())
     }
 }
@@ -244,30 +244,30 @@ where
         let mut corr = Array2::zeros((self.guess_range, self.num_samples));
         for guess in 0..self.guess_range {
             for u in 0..self.guess_range {
-                modeled_leakages[u] = leakage_model(u, guess) as f32;
+                modeled_leakages[u] = leakage_model(u, guess) as f64;
             }
 
-            let mean_key = self.guess_sum_traces[guess] as f32 / self.num_traces as f32;
+            let mean_key = self.guess_sum_traces[guess] as f64 / self.num_traces as f64;
             let mean_squares_key =
-                self.guess_sum_squares_traces[guess] as f32 / self.num_traces as f32;
+                self.guess_sum_squares_traces[guess] as f64 / self.num_traces as f64;
             let var_key = mean_squares_key - (mean_key * mean_key);
 
             let guess_corr: Vec<_> = (0..self.num_samples)
                 .into_par_iter()
                 .map(|u| {
-                    let mean_traces = self.sum_traces[u].as_() / self.num_traces as f32;
+                    let mean_traces = self.sum_traces[u].as_() / self.num_traces as f64;
 
                     let cov = self
                         .plaintext_sum_traces
                         .column(u)
                         .mapv(|x| x.as_())
                         .dot(&modeled_leakages.view());
-                    let cov = cov / self.num_traces as f32 - (mean_key * mean_traces);
+                    let cov = cov / self.num_traces as f64 - (mean_key * mean_traces);
 
                     let mean_squares_traces =
-                        self.sum_square_traces[u].as_() / self.num_traces as f32;
+                        self.sum_square_traces[u].as_() / self.num_traces as f64;
                     let var_traces = mean_squares_traces - (mean_traces * mean_traces);
-                    f32::abs(cov / f32::sqrt(var_key * var_traces))
+                    f64::abs(cov / f64::sqrt(var_key * var_traces))
                 })
                 .collect();
 

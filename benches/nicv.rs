@@ -5,7 +5,7 @@ use ndarray_rand::RandomExt;
 use ndarray_rand::rand::{SeedableRng, rngs::StdRng};
 use ndarray_rand::rand_distr::Uniform;
 
-fn nicv_sequential(traces: &Array2<i64>, plaintexts: &Array2<u8>) -> Array1<f32> {
+fn nicv_sequential(traces: &Array2<i64>, plaintexts: &Array2<u8>) -> Array1<f64> {
     let mut nicv = NicvProcessor::new(traces.shape()[1], 256);
 
     for i in 0..traces.shape()[0] {
@@ -15,7 +15,7 @@ fn nicv_sequential(traces: &Array2<i64>, plaintexts: &Array2<u8>) -> Array1<f32>
     nicv.nicv()
 }
 
-fn nicv_parallel(traces: &Array2<i64>, plaintexts: &Array2<u8>) -> Array1<f32> {
+fn nicv_parallel(traces: &Array2<i64>, plaintexts: &Array2<u8>) -> Array1<f64> {
     nicv(traces.view(), 256, |i| plaintexts.row(i)[0].into(), 500)
 }
 

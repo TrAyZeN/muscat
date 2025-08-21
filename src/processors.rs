@@ -59,13 +59,13 @@ where
     }
 
     /// Returns trace mean.
-    pub fn mean(&self) -> Array1<f32> {
-        self.sum.mapv(|x| x.as_() / self.count as f32)
+    pub fn mean(&self) -> Array1<f64> {
+        self.sum.mapv(|x| x.as_() / self.count as f64)
     }
 
     /// Calculates and returns traces variance.
-    pub fn var(&self) -> Array1<f32> {
-        let count = self.count as f32;
+    pub fn var(&self) -> Array1<f64> {
+        let count = self.count as f64;
 
         zip(self.sum.iter(), self.sum_squares.iter())
             .map(|(&sum, &sum_squares)| (sum_squares.as_() / count) - (sum.as_() / count).powi(2))
@@ -124,19 +124,19 @@ mod tests {
         processor.process(array![28038i16, 22066i16, -20614i16, -9763i16].view());
         assert_eq!(
             processor.mean(),
-            array![28038f32, 22066f32, -20614f32, -9763f32]
+            array![28038f64, 22066f64, -20614f64, -9763f64]
         );
-        assert_eq!(processor.var(), array![0f32, 0f32, 0f32, 0f32]);
+        assert_eq!(processor.var(), array![0f64, 0f64, 0f64, 0f64]);
         processor.process(array![31377, -6950, -15666, 26773].view());
         processor.process(array![24737, -18311, 24742, 17207].view());
         processor.process(array![12974, -29255, -28798, 18988].view());
         assert_eq!(
             processor.mean(),
-            array![24281.5f32, -8112.5f32, -10084f32, 13301.25f32]
+            array![24281.5f64, -8112.5f64, -10084f64, 13301.25f64]
         );
         assert_eq!(
             processor.var(),
-            array![48131136.0, 365777020.0, 426275900.0, 190260430.0]
+            array![48131112.25, 365776994.25, 426275924.0, 190260421.1875]
         );
     }
 }

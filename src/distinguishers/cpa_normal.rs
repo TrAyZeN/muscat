@@ -99,11 +99,11 @@ where
     #[serde(bound(deserialize = "<T as Sample>::Container: Deserialize<'de>"))]
     sum_traces2: Array1<<T as Sample>::Container>,
     /// Sum of traces per key guess
-    guess_sum_traces: Array1<f32>,
+    guess_sum_traces: Array1<f64>,
     /// Sum of square of traces per key guess
-    guess_sum_traces2: Array1<f32>,
-    values: Array2<f32>,
-    cov: Array2<f32>,
+    guess_sum_traces2: Array1<f64>,
+    values: Array2<f64>,
+    cov: Array2<f64>,
     /// Batch size
     batch_size: usize,
     /// Number of traces processed
@@ -154,7 +154,7 @@ where
         for row in 0..self.batch_size {
             for guess in 0..self.guess_range {
                 let pass_to_leakage = plaintext_batch.row(row);
-                self.values[[row, guess]] = leakage_model(pass_to_leakage, guess) as f32;
+                self.values[[row, guess]] = leakage_model(pass_to_leakage, guess) as f64;
             }
         }
 
@@ -189,11 +189,11 @@ where
 
     /// Finalize the calculation after feeding the overall traces.
     pub fn finalize(&self) -> Cpa {
-        let cov_n = self.cov.clone() / self.num_traces as f32;
-        let avg_keys = self.guess_sum_traces.clone() / self.num_traces as f32;
-        let std_key = self.guess_sum_traces2.clone() / self.num_traces as f32;
-        let avg_traces = self.sum_traces.mapv(|x| x.as_()) / self.num_traces as f32;
-        let std_traces = self.sum_traces2.mapv(|x| x.as_()) / self.num_traces as f32;
+        let cov_n = self.cov.clone() / self.num_traces as f64;
+        let avg_keys = self.guess_sum_traces.clone() / self.num_traces as f64;
+        let std_key = self.guess_sum_traces2.clone() / self.num_traces as f64;
+        let avg_traces = self.sum_traces.mapv(|x| x.as_()) / self.num_traces as f64;
+        let std_traces = self.sum_traces2.mapv(|x| x.as_()) / self.num_traces as f64;
 
         let mut corr = Array2::zeros((self.guess_range, self.num_samples));
         for i in 0..self.guess_range {
@@ -204,7 +204,7 @@ where
 
                 let denominator_2 = std_traces[x] - (avg_traces[x] * avg_traces[x]);
                 if numerator != 0.0 {
-                    corr[[i, x]] = f32::abs(numerator / f32::sqrt(denominator_1 * denominator_2));
+                    corr[[i, x]] = f64::abs(numerator / f64::sqrt(denominator_1 * denominator_2));
                 }
             }
         }
