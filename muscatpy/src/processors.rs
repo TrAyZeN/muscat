@@ -1,4 +1,4 @@
-use muscat::processors::MeanVar;
+use muscat::processors::MeanVarProcessor;
 use numpy::{
     IntoPyArray, PyArray1, PyArray2, PyArrayDescrMethods, PyArrayMethods, PyUntypedArray,
     PyUntypedArrayMethods, dtype,
@@ -30,7 +30,7 @@ pub fn compute_mean<'py>(
                     let traces_ro = traces.readonly();
                     let traces = traces_ro.as_array();
 
-                    let mut meanvar = MeanVar::new(traces.shape()[1]);
+                    let mut meanvar = MeanVarProcessor::new(traces.shape()[1]);
                     for trace in traces.rows() {
                         meanvar.process(trace);
                     }
@@ -72,7 +72,7 @@ pub fn compute_var<'py>(
                     let traces_ro = traces.readonly();
                     let traces = traces_ro.as_array();
 
-                    let mut meanvar = MeanVar::new(traces.shape()[1]);
+                    let mut meanvar = MeanVarProcessor::new(traces.shape()[1]);
                     for trace in traces.rows() {
                         meanvar.process(trace);
                     }
