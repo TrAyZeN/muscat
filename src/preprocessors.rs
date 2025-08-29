@@ -6,7 +6,7 @@ use std::{
     ops::{Div, Range},
 };
 
-use crate::{Sample, processors::MeanVar};
+use crate::{Sample, processors::MeanVarProcessor};
 
 /// Computes the centered product of "order" leakage samples
 /// Used particularly when performing high-order SCA
@@ -121,7 +121,7 @@ where
     T: Sample,
 {
     /// meanVar processor
-    meanvar: MeanVar<T>,
+    meanvar: MeanVarProcessor<T>,
     /// mean
     mean: Array1<f32>,
     /// std
@@ -134,7 +134,7 @@ where
 {
     pub fn new(size: usize) -> Self {
         Self {
-            meanvar: MeanVar::new(size),
+            meanvar: MeanVarProcessor::new(size),
             mean: Array1::zeros(size),
             std: Array1::zeros(size),
         }

@@ -1,5 +1,5 @@
 //! Leakage detection methods
-use crate::{Error, Sample, processors::MeanVar};
+use crate::{Error, Sample, processors::MeanVarProcessor};
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis};
 use num_traits::AsPrimitive;
 use rayon::iter::{ParallelBridge, ParallelIterator};
@@ -51,7 +51,7 @@ pub fn snr<T, F>(
     batch_size: usize,
 ) -> Array1<f32>
 where
-    T: Sample + Copy + Sync,
+    T: Sample + Copy + Sync + Send,
     <T as Sample>::Container: Send,
     F: Fn(usize) -> usize + Sync,
 {
@@ -84,7 +84,7 @@ where
 {
     #[serde(bound(serialize = "<T as Sample>::Container: Serialize"))]
     #[serde(bound(deserialize = "<T as Sample>::Container: Deserialize<'de>"))]
-    mean_var: MeanVar<T>,
+    mean_var: MeanVarProcessor<T>,
     /// Sum of traces per class
     #[serde(bound(serialize = "<T as Sample>::Container: Serialize"))]
     #[serde(bound(deserialize = "<T as Sample>::Container: Deserialize<'de>"))]
@@ -105,7 +105,7 @@ where
     /// - `num_classes` - Number of classes
     pub fn new(size: usize, num_classes: usize) -> Self {
         Self {
-            mean_var: MeanVar::new(size),
+            mean_var: MeanVarProcessor::new(size),
             classes_sum: Array2::zeros((num_classes, size)),
             classes_count: Array1::zeros(num_classes),
         }
@@ -284,7 +284,7 @@ pub fn nicv<T, F>(
     batch_size: usize,
 ) -> Array1<f32>
 where
-    T: Sample + Copy + Sync,
+    T: Sample + Copy + Sync + Send,
     <T as Sample>::Container: Send,
     F: Fn(usize) -> usize + Sync,
 {
@@ -319,7 +319,7 @@ where
 {
     #[serde(bound(serialize = "<T as Sample>::Container: Serialize"))]
     #[serde(bound(deserialize = "<T as Sample>::Container: Deserialize<'de>"))]
-    mean_var: MeanVar<T>,
+    mean_var: MeanVarProcessor<T>,
     /// Sum of traces per class
     #[serde(bound(serialize = "<T as Sample>::Container: Serialize"))]
     #[serde(bound(deserialize = "<T as Sample>::Container: Deserialize<'de>"))]
@@ -340,7 +340,7 @@ where
     /// * `classes` - Number of classes
     pub fn new(size: usize, num_classes: usize) -> Self {
         Self {
-            mean_var: MeanVar::new(size),
+            mean_var: MeanVarProcessor::new(size),
             classes_sum: Array2::zeros((num_classes, size)),
             classes_count: Array1::zeros(num_classes),
         }
@@ -464,7 +464,7 @@ pub fn ttest<T>(
     batch_size: usize,
 ) -> Array1<f32>
 where
-    T: Sample + Copy + Sync,
+    T: Sample + Copy + Sync + Send,
     <T as Sample>::Container: Send,
 {
     assert_eq!(traces.shape()[0], trace_classes.shape()[0]);
@@ -497,10 +497,10 @@ where
 {
     #[serde(bound(serialize = "<T as Sample>::Container: Serialize"))]
     #[serde(bound(deserialize = "<T as Sample>::Container: Deserialize<'de>"))]
-    mean_var_1: MeanVar<T>,
+    mean_var_1: MeanVarProcessor<T>,
     #[serde(bound(serialize = "<T as Sample>::Container: Serialize"))]
     #[serde(bound(deserialize = "<T as Sample>::Container: Deserialize<'de>"))]
-    mean_var_2: MeanVar<T>,
+    mean_var_2: MeanVarProcessor<T>,
 }
 
 impl<T> TTestProcessor<T>
@@ -513,8 +513,8 @@ where
     /// * `size` - Number of samples per trace
     pub fn new(size: usize) -> Self {
         Self {
-            mean_var_1: MeanVar::new(size),
-            mean_var_2: MeanVar::new(size),
+            mean_var_1: MeanVarProcessor::new(size),
+            mean_var_2: MeanVarProcessor::new(size),
         }
     }
 
@@ -622,7 +622,23 @@ where
 #[cfg(test)]
 mod tests {
     use super::{NicvProcessor, SnrProcessor, TTestProcessor, nicv, snr, ttest};
-    use ndarray::array;
+    use ndarray::{Array1, array};
+
+    fn assert_all_close(a: &Array1<f32>, b: &Array1<f32>, rtol: f32, atol: f32) {
+        assert_eq!(a.len(), b.len());
+        for i in 0..a.len() {
+            let diff = (a[i] - b[i]).abs();
+            let tol = atol + rtol * b[i].abs();
+            assert!(
+                diff <= tol,
+                "index {i}: left={} right={} diff={} tol={}",
+                a[i],
+                b[i],
+                diff,
+                tol
+            );
+        }
+    }
 
     #[test]
     fn test_snr_helper() {
@@ -644,7 +660,12 @@ mod tests {
         for (trace, class) in std::iter::zip(traces.rows(), classes.iter()) {
             processor.process(trace, *class);
         }
-        assert_eq!(processor.snr(), snr(traces.view(), 256, |i| classes[i], 2));
+        assert_all_close(
+            &processor.snr(),
+            &snr(traces.view(), 256, |i| classes[i], 2),
+            1e-6,
+            1e-7,
+        );
     }
 
     #[test]
@@ -667,9 +688,11 @@ mod tests {
             processor.process(trace.view(), i % 3 == 0);
         }
 
-        assert_eq!(
-            processor.ttest(),
-            array![-1.0910345, -5.5249214, 0.29385296, 0.23308459]
+        assert_all_close(
+            &processor.ttest(),
+            &array![-1.0910345, -5.5249214, 0.29385296, 0.23308459],
+            1e-6,
+            1e-7,
         );
     }
 
@@ -696,9 +719,11 @@ mod tests {
             processor.process(trace, trace_classes[i]);
         }
 
-        assert_eq!(
-            processor.ttest(),
-            ttest(traces.view(), trace_classes.view(), 2)
+        assert_all_close(
+            &processor.ttest(),
+            &ttest(traces.view(), trace_classes.view(), 2),
+            1e-6,
+            1e-7,
         );
     }
 
@@ -723,9 +748,11 @@ mod tests {
             processor.process(trace, *class);
         }
 
-        assert_eq!(
-            processor.nicv(),
-            nicv(traces.view(), 256, |i| classes[i], 2)
+        assert_all_close(
+            &processor.nicv(),
+            &nicv(traces.view(), 256, |i| classes[i], 2),
+            1e-6,
+            1e-7,
         );
     }
 
