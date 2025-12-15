@@ -1,3 +1,72 @@
+//! # muscat
+//! muscat is a library implementing state-of-the-art side channel attacks (SCAs) algorithms.
+//!
+//! Traces are processed by processors that exposes a streaming interface. A
+//! processor is a structure implementing an `update` method to add a trace to
+//! the computation, allowing to incrementally process traces, and a `finalize`
+//! method to finalize the computation and return the result.
+//!
+//! # Supported algorithms
+//! - CPA
+//! - DPA
+//! - SNR
+//! - NICV
+//! - Welch's T-Test
+//! - Elastic alignment
+//!
+//! # Getting started
+//! Here is an example of how to use the CPA processor to recover the first byte of the key:
+//! ```rust
+//! use ndarray::array;
+//! use std::iter::zip;
+//!
+//! use muscat::distinguishers::cpa::CpaProcessor;
+//! use muscat::leakage_model::aes::sbox;
+//! use muscat::trace::Trace;
+//!
+//! let traces = array![
+//!     [77u8, 137, 51, 91],
+//!     [72, 61, 91, 83],
+//!     [39, 49, 52, 23],
+//!     [26, 114, 63, 45],
+//!     [30, 8, 97, 91],
+//!     [13, 68, 7, 45],
+//!     [17, 181, 60, 34],
+//!     [43, 88, 76, 78],
+//!     [0, 36, 35, 0],
+//!     [93, 191, 49, 26],
+//! ];
+//! let plaintexts = array![
+//!     [1usize, 2],
+//!     [2, 1],
+//!     [1, 2],
+//!     [1, 2],
+//!     [2, 1],
+//!     [2, 1],
+//!     [1, 2],
+//!     [1, 2],
+//!     [2, 1],
+//!     [2, 1],
+//! ];
+//!
+//! fn leakage_model(plaintext_byte: usize, guess: usize) -> usize {
+//!     sbox((plaintext_byte ^ guess) as u8) as usize
+//! }
+//!
+//! let mut processor = CpaProcessor::new(traces.shape()[1], 256);
+//! for (trace, plaintext) in zip(traces.rows(), plaintexts.rows()) {
+//!     processor.update(trace.view(), plaintext[0], leakage_model);
+//! }
+//! let cpa = processor.finalize(leakage_model);
+//! let best_guess = cpa.best_guess();
+//! println!("Best subkey guess: {best_guess:?}");
+//! ```
+//!
+//! More examples are available in the [examples](https://github.com/Ledger-Donjon/muscat/tree/master/examples) directory.
+//!
+//! # Performance
+//! To get the best performance out of muscat, it is recommended to compile in release mode.
+
 pub mod asymmetric;
 pub mod distinguishers;
 pub mod error;

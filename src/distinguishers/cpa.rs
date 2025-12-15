@@ -134,7 +134,7 @@ where
 {
     /// Number of samples per trace
     num_samples: usize,
-    /// Guess range upper excluded bound
+    /// Guess range upper exclusive bound
     guess_range: usize,
     /// Sum of traces
     #[serde(bound(serialize = "<T as Sample>::Container: Serialize"))]

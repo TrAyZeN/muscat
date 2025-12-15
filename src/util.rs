@@ -83,7 +83,7 @@ where
 /// [ChipWhisperer](https://github.com/newaetech/chipwhisperer) to integer.
 ///
 /// # References
-/// https://github.com/newaetech/chipwhisperer/blob/918e20d7a6ac7211dac61a70d233872045eb113e/software/chipwhisperer/capture/scopes/cwnano.py#L740-L744
+/// <https://github.com/newaetech/chipwhisperer/blob/918e20d7a6ac7211dac61a70d233872045eb113e/software/chipwhisperer/capture/scopes/cwnano.py#L740-L744>
 pub fn chipwhisperer_float_to_u16(x: f64) -> u16 {
     debug_assert!((-0.5..=0.5).contains(&x));
 

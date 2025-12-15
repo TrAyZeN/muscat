@@ -60,9 +60,9 @@ impl CenteredProduct {
     }
 
     /// Apply the processing to an input trace
-    /// The centered product substract the mean of the traces and then perform products between every input time samples
+    /// The centered product subtracts the mean of the traces and then performs products between input samples
     pub fn apply<T: Into<f32> + Copy>(&self, trace: ArrayView1<T>) -> Array1<f32> {
-        // First we substract the mean trace
+        // First we subtract the mean trace
         let centered_trace: Array1<f32> = trace.mapv(|x| x.into()) - &self.mean;
         let length_out_trace: usize = self.intervals.iter().map(|x| x.len()).product();
 
@@ -71,7 +71,7 @@ impl CenteredProduct {
         // Then we do the products
         let multi_prod = (0..self.intervals.len())
             .map(|i| self.intervals[i].clone())
-            .multi_cartesian_product(); //NOTE/TODO: maybe this can go in the struct parameters, which could improve performances
+            .multi_cartesian_product(); // NOTE/TODO: maybe this can go in the struct parameters, which could improve performance
 
         for (idx, combination) in multi_prod.enumerate() {
             for i in combination {
@@ -159,8 +159,10 @@ where
 
 pub use dtw::dist;
 
-/// Align traces using elastic alignment [1]. Elastic alignment is a dynamic alignment algorithm
+/// Align traces using elastic alignment[^1]. Elastic alignment is a dynamic alignment algorithm
 /// based on FastDTW.
+///
+/// [^1]: van Woudenberg, J.G.J., Witteman, M.F., Bakker, B. (2011). Improving Differential Power Analysis by Elastic Alignment. In: Kiayias, A. (eds) Topics in Cryptology – CT-RSA 2011. CT-RSA 2011. Lecture Notes in Computer Science, vol 6558. Springer, Berlin, Heidelberg. <https://doi.org/10.1007/978-3-642-19074-2_8>
 ///
 /// # Examples
 /// ```rust
@@ -173,12 +175,6 @@ pub use dtw::dist;
 ///
 /// let aligned_trace = elastic_alignment.align(trace_to_align.view());
 /// ```
-///
-/// # References
-/// [1] van Woudenberg, J.G.J., Witteman, M.F., Bakker, B. (2011). Improving Differential Power
-/// Analysis by Elastic Alignment. In: Kiayias, A. (eds) Topics in Cryptology – CT-RSA 2011. CT-RSA
-/// 2011. Lecture Notes in Computer Science, vol 6558. Springer, Berlin, Heidelberg.
-/// https://doi.org/10.1007/978-3-642-19074-2_8
 pub struct ElasticAlignment<T, D>
 where
     D: Fn(T, T) -> T,
@@ -245,7 +241,7 @@ where
 {
     /// Align given trace using elastic alignment (see [`ElasticAlignment`]).
     ///
-    /// NOTE: See [`ElasticAlignment::align_with_cmp`] for type than do not implement [`Ord`].
+    /// NOTE: See [`ElasticAlignment::align_with_cmp`] for types that do not implement [`Ord`].
     pub fn align(&self, trace: ArrayView1<T>) -> Array1<T> {
         self.align_with_cmp(trace, &T::Container::cmp)
     }

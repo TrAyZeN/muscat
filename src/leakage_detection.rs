@@ -77,7 +77,9 @@ where
         .snr()
 }
 
-/// A Processor that computes the Signal-to-Noise Ratio of the given traces
+/// A processor that computes the Signal-to-Noise Ratio[^1] (SNR) of the given traces.
+///
+/// [^1]: <https://en.wikipedia.org/wiki/Signal-to-noise_ratio>
 #[derive(Serialize, Deserialize)]
 pub struct SnrProcessor<T>
 where
@@ -303,7 +305,7 @@ where
         .nicv()
 }
 
-/// Processes traces to calculate the Normalized Inter-Class Variance [^1].
+/// A processor that computes the Normalized Inter-Class Variance[^1] (NICV) of given traces.
 ///
 /// [^1]: <https://eprint.iacr.org/2014/1020.pdf>
 #[derive(Serialize, Deserialize)]
