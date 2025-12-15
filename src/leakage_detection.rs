@@ -5,9 +5,9 @@ use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis};
 use num_traits::AsPrimitive;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use serde::{Deserialize, Serialize};
-use std::{fs::File, iter::zip, ops::Add, path::Path};
+use std::{fs::File, iter::zip, path::Path};
 
-/// Compute the SNR of the given traces using [`SnrProcessor`].
+/// Compute the SNR of the given traces using an [`SnrProcessor`].
 ///
 /// `get_class` is a function returning the class of the given trace by index.
 ///
@@ -72,7 +72,7 @@ where
                 snr
             },
         )
-        .reduce_with(|a, b| a + b)
+        .reduce_with(|a, b| a.combine(b))
         .unwrap()
         .snr()
 }
@@ -172,7 +172,23 @@ where
         self.classes_count.shape()[0]
     }
 
-    /// Determine if two [`SnrProcessor`] are compatible for addition.
+    /// Merge computations of two [`SnrProcessor`]. Processors need to be compatible to be merged
+    /// together, otherwise it can panic or yield incoherent result (see
+    /// [`SnrProcessor::is_compatible_with`]).
+    ///
+    /// # Panics
+    /// - Panics in debug if the processors are not compatible.
+    pub fn combine(self, rhs: Self) -> Self {
+        debug_assert!(self.is_compatible_with(&rhs));
+
+        Self {
+            mean_var: self.mean_var.combine(rhs.mean_var),
+            classes_sum: self.classes_sum + rhs.classes_sum,
+            classes_count: self.classes_count + rhs.classes_count,
+        }
+    }
+
+    /// Determine if two [`SnrProcessor`] are compatible to be merged.
     ///
     /// If they were created with the same parameters, they are compatible.
     fn is_compatible_with(&self, other: &Self) -> bool {
@@ -216,30 +232,7 @@ where
     }
 }
 
-impl<T> Add for SnrProcessor<T>
-where
-    T: Sample + Copy,
-{
-    type Output = Self;
-
-    /// Merge computations of two [`SnrProcessor`]. Processors need to be compatible to be merged
-    /// together, otherwise it can panic or yield incoherent result (see
-    /// [`SnrProcessor::is_compatible_with`]).
-    ///
-    /// # Panics
-    /// - Panics in debug if the processors are not compatible.
-    fn add(self, rhs: Self) -> Self::Output {
-        debug_assert!(self.is_compatible_with(&rhs));
-
-        Self {
-            mean_var: self.mean_var + rhs.mean_var,
-            classes_sum: self.classes_sum + rhs.classes_sum,
-            classes_count: self.classes_count + rhs.classes_count,
-        }
-    }
-}
-
-/// Computes the NICV of the given traces using [`NicvProcessor`].
+/// Computes the NICV of the given traces using an [`NicvProcessor`].
 ///
 /// `get_class` is a function returning the class of the given trace by index.
 ///
@@ -305,7 +298,7 @@ where
                 nicv
             },
         )
-        .reduce_with(|a, b| a + b)
+        .reduce_with(|a, b| a.combine(b))
         .unwrap()
         .nicv()
 }
@@ -401,34 +394,27 @@ where
         self.classes_count.shape()[0]
     }
 
-    /// Determine if two [`NicvProcessor`] are compatible for addition.
-    ///
-    /// If they were created with the same parameters, they are compatible.
-    fn is_compatible_with(&self, other: &Self) -> bool {
-        self.trace_length() == other.trace_length() && self.num_classes() == other.num_classes()
-    }
-}
-
-impl<T> Add for NicvProcessor<T>
-where
-    T: Sample + Copy,
-{
-    type Output = Self;
-
     /// Merge computations of two [`NicvProcessor`]. Processors need to be compatible to be merged
     /// together, otherwise it can panic or yield incoherent result (see
     /// [`NicvProcessor::is_compatible_with`]).
     ///
     /// # Panics
     /// Panics in debug if the processors are not compatible.
-    fn add(self, rhs: Self) -> Self::Output {
+    pub fn combine(self, rhs: Self) -> Self {
         debug_assert!(self.is_compatible_with(&rhs));
 
         Self {
-            mean_var: self.mean_var + rhs.mean_var,
+            mean_var: self.mean_var.combine(rhs.mean_var),
             classes_sum: self.classes_sum + rhs.classes_sum,
             classes_count: self.classes_count + rhs.classes_count,
         }
+    }
+
+    /// Determine if two [`NicvProcessor`] are compatible to be merged.
+    ///
+    /// If they were created with the same parameters, they are compatible.
+    fn is_compatible_with(&self, other: &Self) -> bool {
+        self.trace_length() == other.trace_length() && self.num_classes() == other.num_classes()
     }
 }
 
@@ -485,12 +471,14 @@ where
             ttest
         },
     )
-    .reduce_with(|a, b| a + b)
+    .reduce_with(|a, b| a.combine(b))
     .unwrap()
     .ttest()
 }
 
-/// A Processor that computes the Welch's T-Test of the given traces.
+/// A processor that computes the Welch's T-Test[^1] of the given traces.
+///
+/// [^1]: <https://en.wikipedia.org/wiki/Welch%27s_t-test>
 #[derive(Serialize, Deserialize)]
 pub struct TTestProcessor<T>
 where
@@ -554,7 +542,22 @@ where
         self.mean_var_1.trace_length()
     }
 
-    /// Determine if two [`TTestProcessor`] are compatible for addition.
+    /// Merge computations of two [`TTestProcessor`]. Processors need to be compatible to be merged
+    /// together, otherwise it can panic or yield incoherent result (see
+    /// [`TTestProcessor::is_compatible_with`]).
+    ///
+    /// # Panics
+    /// Panics in debug if the processors are not compatible.
+    pub fn combine(self, rhs: Self) -> Self {
+        debug_assert!(self.is_compatible_with(&rhs));
+
+        Self {
+            mean_var_1: self.mean_var_1.combine(rhs.mean_var_1),
+            mean_var_2: self.mean_var_2.combine(rhs.mean_var_2),
+        }
+    }
+
+    /// Determine if two [`TTestProcessor`] are compatible to be merged.
     ///
     /// If they were created with the same parameters, they are compatible.
     fn is_compatible_with(&self, other: &Self) -> bool {
@@ -595,28 +598,6 @@ where
         let p = serde_json::from_reader(file)?;
 
         Ok(p)
-    }
-}
-
-impl<T> Add for TTestProcessor<T>
-where
-    T: Sample + Copy,
-{
-    type Output = Self;
-
-    /// Merge computations of two [`TTestProcessor`]. Processors need to be compatible to be merged
-    /// together, otherwise it can panic or yield incoherent result (see
-    /// [`TTestProcessor::is_compatible_with`]).
-    ///
-    /// # Panics
-    /// Panics in debug if the processors are not compatible.
-    fn add(self, rhs: Self) -> Self::Output {
-        debug_assert!(self.is_compatible_with(&rhs));
-
-        Self {
-            mean_var_1: self.mean_var_1 + rhs.mean_var_1,
-            mean_var_2: self.mean_var_2 + rhs.mean_var_2,
-        }
     }
 }
 

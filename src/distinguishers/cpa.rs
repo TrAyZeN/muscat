@@ -9,7 +9,7 @@ use rayon::{
     prelude::{IntoParallelIterator, ParallelIterator},
 };
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, fs::File, iter::zip, ops::Add, path::Path};
+use std::{fmt::Debug, fs::File, iter::zip, path::Path};
 
 /// Result of the CPA[^1] on some traces.
 ///
@@ -117,7 +117,7 @@ where
             cpa
         },
     )
-    .reduce_with(|a, b| a + b)
+    .reduce_with(|a, b| a.combine(b))
     .unwrap()
     .finalize(leakage_model)
 }
@@ -174,7 +174,7 @@ where
         }
     }
 
-    /// Determine if two [`CpaProcessor`] are compatible for addition.
+    /// Determine if two [`CpaProcessor`] are compatible to be merged.
     ///
     /// If they were created with the same parameters, they are compatible.
     fn is_compatible_with(&self, other: &Self) -> bool {
@@ -279,6 +279,27 @@ where
 
         Cpa { corr }
     }
+
+    /// Merge computations of two [`CpaProcessor`]. Processors need to be compatible to be merged
+    /// together, otherwise it can panic or yield incoherent result (see
+    /// [`CpaProcessor::is_compatible_with`]).
+    ///
+    /// # Panics
+    /// Panics in debug if the processors are not compatible.
+    pub fn combine(self, rhs: Self) -> Self {
+        debug_assert!(self.is_compatible_with(&rhs));
+
+        Self {
+            num_samples: self.num_samples,
+            guess_range: self.guess_range,
+            sum_traces: self.sum_traces + rhs.sum_traces,
+            sum_square_traces: self.sum_square_traces + rhs.sum_square_traces,
+            guess_sum_traces: self.guess_sum_traces + rhs.guess_sum_traces,
+            guess_sum_squares_traces: self.guess_sum_squares_traces + rhs.guess_sum_squares_traces,
+            plaintext_sum_traces: self.plaintext_sum_traces + rhs.plaintext_sum_traces,
+            num_traces: self.num_traces + rhs.num_traces,
+        }
+    }
 }
 
 impl<T> CpaProcessor<T>
@@ -314,34 +335,6 @@ where
         let p: Self = serde_json::from_reader(file)?;
 
         Ok(p)
-    }
-}
-
-impl<T> Add for CpaProcessor<T>
-where
-    T: Sample + Copy,
-{
-    type Output = Self;
-
-    /// Merge computations of two [`CpaProcessor`]. Processors need to be compatible to be merged
-    /// together, otherwise it can panic or yield incoherent result (see
-    /// [`CpaProcessor::is_compatible_with`]).
-    ///
-    /// # Panics
-    /// Panics in debug if the processors are not compatible.
-    fn add(self, rhs: Self) -> Self::Output {
-        debug_assert!(self.is_compatible_with(&rhs));
-
-        Self {
-            num_samples: self.num_samples,
-            guess_range: self.guess_range,
-            sum_traces: self.sum_traces + rhs.sum_traces,
-            sum_square_traces: self.sum_square_traces + rhs.sum_square_traces,
-            guess_sum_traces: self.guess_sum_traces + rhs.guess_sum_traces,
-            guess_sum_squares_traces: self.guess_sum_squares_traces + rhs.guess_sum_squares_traces,
-            plaintext_sum_traces: self.plaintext_sum_traces + rhs.plaintext_sum_traces,
-            num_traces: self.num_traces + rhs.num_traces,
-        }
     }
 }
 

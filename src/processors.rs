@@ -1,8 +1,9 @@
-//! Traces processing algorithms
+//! Trace processing algorithms
+
 use ndarray::{Array1, ArrayView1};
 use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
-use std::{iter::zip, ops::Add};
+use std::iter::zip;
 
 use crate::Sample;
 
@@ -82,27 +83,13 @@ where
         self.count
     }
 
-    /// Determine if two [`MeanVar`] are compatible for addition.
-    ///
-    /// If they were created with the same parameters, they are compatible.
-    fn is_compatible_with(&self, other: &Self) -> bool {
-        self.trace_length() == other.trace_length()
-    }
-}
-
-impl<T> Add for MeanVar<T>
-where
-    T: Sample + Copy,
-{
-    type Output = Self;
-
     /// Merge computations of two [`MeanVar`]. Processors need to be compatible to be merged
     /// together, otherwise it can panic or yield incoherent result (see
     /// [`MeanVar::is_compatible_with`]).
     ///
     /// # Panics
     /// Panics in debug if the processors are not compatible.
-    fn add(self, rhs: Self) -> Self::Output {
+    pub fn combine(self, rhs: Self) -> Self {
         debug_assert!(self.is_compatible_with(&rhs));
 
         Self {
@@ -110,6 +97,13 @@ where
             sum_squares: self.sum_squares + rhs.sum_squares,
             count: self.count + rhs.count,
         }
+    }
+
+    /// Determine if two [`MeanVar`] are compatible to be merged.
+    ///
+    /// If they were created with the same parameters, they are compatible.
+    fn is_compatible_with(&self, other: &Self) -> bool {
+        self.trace_length() == other.trace_length()
     }
 }
 

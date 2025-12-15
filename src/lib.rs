@@ -16,7 +16,8 @@ use num_traits::{AsPrimitive, Zero};
 
 pub use crate::error::Error;
 
-/// Sample type that can be processed by [`muscat`] processors.
+/// Sample type that can be processed by processors.
+/// This trait is used to restrict the traces sample type processed by processors.
 ///
 /// # Dyn compatibility
 /// This trait is not [dyn compatible](https://doc.rust-lang.org/nightly/reference/items/traits.html#dyn-compatibility).

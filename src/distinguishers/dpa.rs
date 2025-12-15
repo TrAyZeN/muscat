@@ -2,7 +2,7 @@ use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis};
 use num_traits::AsPrimitive;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use serde::{Deserialize, Serialize};
-use std::{fs::File, iter::zip, marker::PhantomData, ops::Add, path::Path};
+use std::{fs::File, iter::zip, marker::PhantomData, path::Path};
 
 use crate::{
     Error, Sample,
@@ -85,7 +85,7 @@ where
             dpa
         },
     )
-    .reduce_with(|a, b| a + b)
+    .reduce_with(|a, b| a.combine(b))
     .unwrap()
     .finalize()
 }
@@ -230,7 +230,28 @@ where
         }
     }
 
-    /// Determine if two [`DpaProcessor`] are compatible for addition.
+    /// Merge computations of two [`DpaProcessor`]. Processors need to be compatible to be merged
+    /// together, otherwise it can panic or yield incoherent result (see
+    /// [`DpaProcessor::is_compatible_with`]).
+    ///
+    /// # Panics
+    /// Panics in debug if the processors are not compatible.
+    pub fn combine(self, rhs: Self) -> Self {
+        debug_assert!(self.is_compatible_with(&rhs));
+
+        Self {
+            num_samples: self.num_samples,
+            guess_range: self.guess_range,
+            sum_0: self.sum_0 + rhs.sum_0,
+            sum_1: self.sum_1 + rhs.sum_1,
+            count_0: self.count_0 + rhs.count_0,
+            count_1: self.count_1 + rhs.count_1,
+            num_traces: self.num_traces + rhs.num_traces,
+            _metadata: PhantomData,
+        }
+    }
+
+    /// Determine if two [`DpaProcessor`] are compatible to be merged.
     ///
     /// If they were created with the same parameters, they are compatible.
     fn is_compatible_with(&self, other: &Self) -> bool {
@@ -271,35 +292,6 @@ where
         let p: DpaProcessor<T, M> = serde_json::from_reader(file)?;
 
         Ok(p)
-    }
-}
-
-impl<T, M> Add for DpaProcessor<T, M>
-where
-    T: Sample + Copy,
-    M: Clone,
-{
-    type Output = Self;
-
-    /// Merge computations of two [`DpaProcessor`]. Processors need to be compatible to be merged
-    /// together, otherwise it can panic or yield incoherent result (see
-    /// [`DpaProcessor::is_compatible_with`]).
-    ///
-    /// # Panics
-    /// Panics in debug if the processors are not compatible.
-    fn add(self, rhs: Self) -> Self::Output {
-        debug_assert!(self.is_compatible_with(&rhs));
-
-        Self {
-            num_samples: self.num_samples,
-            guess_range: self.guess_range,
-            sum_0: self.sum_0 + rhs.sum_0,
-            sum_1: self.sum_1 + rhs.sum_1,
-            count_0: self.count_0 + rhs.count_0,
-            count_1: self.count_1 + rhs.count_1,
-            num_traces: self.num_traces + rhs.num_traces,
-            _metadata: PhantomData,
-        }
     }
 }
 
