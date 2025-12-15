@@ -29,22 +29,22 @@ impl CenteredProduct {
     ///
     /// # Arguments
     ///
-    /// * `size` - Number of samples per trace
+    /// * `trace_length`: Number of samples per trace.
     /// * `intervals` - Intervals to combine
-    pub fn new(size: usize, intervals: Vec<Range<i32>>) -> Self {
+    pub fn new(trace_length: usize, intervals: Vec<Range<i32>>) -> Self {
         Self {
-            acc: Array1::zeros(size),
+            acc: Array1::zeros(trace_length),
             count: 0,
             intervals,
             processed: false,
-            mean: Array1::zeros(size),
+            mean: Array1::zeros(trace_length),
         }
     }
 
     /// Processes an input trace to update internal accumulators.
     pub fn process<T: Into<i64> + Copy>(&mut self, trace: ArrayView1<T>) {
-        let size = self.acc.len();
-        for i in 0..size {
+        let trace_length = self.acc.len();
+        for i in 0..trace_length {
             let x = trace[i].into();
             self.acc[i] += x;
         }
@@ -132,11 +132,11 @@ impl<T> StandardScaler<T>
 where
     T: Sample + Copy,
 {
-    pub fn new(size: usize) -> Self {
+    pub fn new(trace_length: usize) -> Self {
         Self {
-            meanvar: MeanVar::new(size),
-            mean: Array1::zeros(size),
-            std: Array1::zeros(size),
+            meanvar: MeanVar::new(trace_length),
+            mean: Array1::zeros(trace_length),
+            std: Array1::zeros(trace_length),
         }
     }
 

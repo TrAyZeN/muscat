@@ -1,4 +1,5 @@
 //! Leakage detection methods
+
 use crate::{Error, Sample, processors::MeanVar};
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis};
 use num_traits::AsPrimitive;
@@ -101,12 +102,12 @@ where
     ///
     /// # Arguments
     ///
-    /// - `size` - Size of the input traces
-    /// - `num_classes` - Number of classes
-    pub fn new(size: usize, num_classes: usize) -> Self {
+    /// - `trace_length`: number of samples per trace.
+    /// - `num_classes`: number of classes.
+    pub fn new(trace_length: usize, num_classes: usize) -> Self {
         Self {
-            mean_var: MeanVar::new(size),
-            classes_sum: Array2::zeros((num_classes, size)),
+            mean_var: MeanVar::new(trace_length),
+            classes_sum: Array2::zeros((num_classes, trace_length)),
             classes_count: Array1::zeros(num_classes),
         }
     }
@@ -114,14 +115,14 @@ where
     /// Process an input trace to update internal accumulators.
     ///
     /// # Panics
-    /// - Panics in debug if the length of the trace is different from the size of [`SnrProcessor`].
+    /// - Panics in debug if the length of the trace is different from `self.trace_length()`.
     pub fn process(&mut self, trace: ArrayView1<T>, class: usize) {
-        debug_assert!(trace.shape()[0] == self.size());
+        debug_assert!(trace.shape()[0] == self.trace_length());
         debug_assert!(class < self.num_classes());
 
         self.mean_var.process(trace);
 
-        for i in 0..self.size() {
+        for i in 0..self.trace_length() {
             self.classes_sum[[class, i]] += trace[i].into();
         }
 
@@ -136,7 +137,7 @@ where
 
         // Use a numerically stable computation for V[E[L|X]]:
         // V[E[L|X]] = sum_k n_k / N * (mu_k - mu)^2
-        let mut velx = Array1::zeros(self.size());
+        let mut velx = Array1::zeros(self.trace_length());
         for class in 0..self.num_classes() {
             let class_count = self.classes_count[class];
             if self.classes_count[class] == 0 {
@@ -161,8 +162,8 @@ where
         velx.clone() / (var - velx)
     }
 
-    /// Return the trace size handled
-    pub fn size(&self) -> usize {
+    /// Return the trace length handled.
+    pub fn trace_length(&self) -> usize {
         self.classes_sum.shape()[1]
     }
 
@@ -175,7 +176,7 @@ where
     ///
     /// If they were created with the same parameters, they are compatible.
     fn is_compatible_with(&self, other: &Self) -> bool {
-        self.size() == other.size() && self.num_classes() == other.num_classes()
+        self.trace_length() == other.trace_length() && self.num_classes() == other.num_classes()
     }
 }
 
@@ -336,12 +337,12 @@ where
     ///
     /// # Arguments
     ///
-    /// * `size` - Size of the input traces
-    /// * `classes` - Number of classes
-    pub fn new(size: usize, num_classes: usize) -> Self {
+    /// * `trace_length`: Number of samples per trace.
+    /// * `num_classes`: Number of classes.
+    pub fn new(trace_length: usize, num_classes: usize) -> Self {
         Self {
-            mean_var: MeanVar::new(size),
-            classes_sum: Array2::zeros((num_classes, size)),
+            mean_var: MeanVar::new(trace_length),
+            classes_sum: Array2::zeros((num_classes, trace_length)),
             classes_count: Array1::zeros(num_classes),
         }
     }
@@ -349,14 +350,14 @@ where
     /// Processes an input trace to update internal accumulators.
     ///
     /// # Panics
-    /// Panics in debug if the length of the trace is different from the size of [`Snr`].
+    /// Panics in debug if the length of the trace is different from `self.trace_length()`.
     pub fn process(&mut self, trace: ArrayView1<T>, class: usize) {
-        debug_assert!(trace.shape()[0] == self.size());
+        debug_assert!(trace.shape()[0] == self.trace_length());
         debug_assert!(class < self.num_classes());
 
         self.mean_var.process(trace);
 
-        for i in 0..self.size() {
+        for i in 0..self.trace_length() {
             self.classes_sum[[class, i]] += trace[i].into();
         }
 
@@ -371,7 +372,7 @@ where
 
         // Use a numerically stable computation for V[E[L|X]]:
         // V[E[L|X]] = sum_k n_k / N * (mu_k - mu)^2
-        let mut velx = Array1::zeros(self.size());
+        let mut velx = Array1::zeros(self.trace_length());
         for class in 0..self.num_classes() {
             let class_count = self.classes_count[class];
             if class_count == 0 {
@@ -390,8 +391,8 @@ where
         velx / self.mean_var.var()
     }
 
-    /// Returns the trace size handled
-    pub fn size(&self) -> usize {
+    /// Returns the trace length handled.
+    pub fn trace_length(&self) -> usize {
         self.classes_sum.shape()[1]
     }
 
@@ -404,7 +405,7 @@ where
     ///
     /// If they were created with the same parameters, they are compatible.
     fn is_compatible_with(&self, other: &Self) -> bool {
-        self.size() == other.size() && self.num_classes() == other.num_classes()
+        self.trace_length() == other.trace_length() && self.num_classes() == other.num_classes()
     }
 }
 
@@ -510,11 +511,11 @@ where
     /// Create a new [`TTestProcessor`].
     ///
     /// # Arguments
-    /// * `size` - Number of samples per trace
-    pub fn new(size: usize) -> Self {
+    /// * `trace_length`: Number of samples per trace.
+    pub fn new(trace_length: usize) -> Self {
         Self {
-            mean_var_1: MeanVar::new(size),
-            mean_var_2: MeanVar::new(size),
+            mean_var_1: MeanVar::new(trace_length),
+            mean_var_2: MeanVar::new(trace_length),
         }
     }
 
@@ -525,9 +526,9 @@ where
     /// * `class` - Indicates to which of the two partitions the given trace belongs.
     ///
     /// # Panics
-    /// Panics in debug if `trace.shape()[0] != self.size()`.
+    /// Panics in debug if `trace.shape()[0] != self.trace_length()`.
     pub fn process(&mut self, trace: ArrayView1<T>, class: bool) {
-        debug_assert!(trace.shape()[0] == self.size());
+        debug_assert!(trace.shape()[0] == self.trace_length());
 
         if class {
             self.mean_var_2.process(trace);
@@ -548,16 +549,16 @@ where
         q / d
     }
 
-    /// Return the trace size handled.
-    pub fn size(&self) -> usize {
-        self.mean_var_1.size()
+    /// Return the trace length handled.
+    pub fn trace_length(&self) -> usize {
+        self.mean_var_1.trace_length()
     }
 
     /// Determine if two [`TTestProcessor`] are compatible for addition.
     ///
     /// If they were created with the same parameters, they are compatible.
     fn is_compatible_with(&self, other: &Self) -> bool {
-        self.size() == other.size()
+        self.trace_length() == other.trace_length()
     }
 }
 

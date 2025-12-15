@@ -32,11 +32,11 @@ where
     ///
     /// # Arguments
     ///
-    /// * `size` - Number of samples per trace
-    pub fn new(size: usize) -> Self {
+    /// * `trace_length`: Number of samples per trace.
+    pub fn new(trace_length: usize) -> Self {
         Self {
-            sum: Array1::zeros(size),
-            sum_squares: Array1::zeros(size),
+            sum: Array1::zeros(trace_length),
+            sum_squares: Array1::zeros(trace_length),
             count: 0,
         }
     }
@@ -44,9 +44,9 @@ where
     /// Processes an input trace to update internal accumulators.
     ///
     /// # Panics
-    /// Panics in debug if the length of the trace is different form the size of [`MeanVar`].
+    /// Panics in debug if the length of the trace is different from `self.trace_length()`.
     pub fn process(&mut self, trace: ArrayView1<T>) {
-        debug_assert!(trace.shape()[0] == self.size());
+        debug_assert!(trace.shape()[0] == self.trace_length());
 
         for i in 0..self.sum.shape()[0] {
             let x = trace[i].into();
@@ -72,8 +72,8 @@ where
             .collect()
     }
 
-    /// Returns the trace size handled.
-    pub fn size(&self) -> usize {
+    /// Returns the trace length handled.
+    pub fn trace_length(&self) -> usize {
         self.sum.shape()[0]
     }
 
@@ -86,7 +86,7 @@ where
     ///
     /// If they were created with the same parameters, they are compatible.
     fn is_compatible_with(&self, other: &Self) -> bool {
-        self.size() == other.size()
+        self.trace_length() == other.trace_length()
     }
 }
 
