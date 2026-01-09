@@ -28,9 +28,16 @@ fn bench_snr(c: &mut Criterion) {
     group.measurement_time(std::time::Duration::from_secs(60));
 
     for num_traces in [5000, 10000, 25000].into_iter() {
-        let traces = Array2::random_using((num_traces, 5000), Uniform::new(-200, 200), &mut rng);
-        let plaintexts =
-            Array2::random_using((num_traces, 16), Uniform::new_inclusive(0, 255), &mut rng);
+        let traces = Array2::random_using(
+            (num_traces, 5000),
+            Uniform::new(-200, 200).unwrap(),
+            &mut rng,
+        );
+        let plaintexts = Array2::random_using(
+            (num_traces, 16),
+            Uniform::new_inclusive(0, 255).unwrap(),
+            &mut rng,
+        );
 
         group.bench_with_input(
             BenchmarkId::new("sequential", num_traces),

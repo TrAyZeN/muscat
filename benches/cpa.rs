@@ -58,10 +58,11 @@ fn bench_cpa(c: &mut Criterion) {
     group.measurement_time(std::time::Duration::from_secs(60));
 
     for num_traces in [5000, 10000, 25000].into_iter() {
-        let traces = Array2::random_using((num_traces, 5000), Uniform::new(-2., 2.), &mut rng);
+        let traces =
+            Array2::random_using((num_traces, 5000), Uniform::new(-2., 2.).unwrap(), &mut rng);
         let plaintexts = Array2::random_using(
             (num_traces, 16),
-            Uniform::new_inclusive(0u8, 255u8),
+            Uniform::new_inclusive(0u8, 255u8).unwrap(),
             &mut rng,
         );
 
@@ -127,10 +128,11 @@ fn bench_finalize(c: &mut Criterion) {
     group.measurement_time(std::time::Duration::from_secs(60));
 
     for num_traces in [5000, 10000, 25000].into_iter() {
-        let traces = Array2::random_using((num_traces, 5000), Uniform::new(-2., 2.), &mut rng);
+        let traces =
+            Array2::random_using((num_traces, 5000), Uniform::new(-2., 2.).unwrap(), &mut rng);
         let plaintexts = Array2::random_using(
             (num_traces, 16),
-            Uniform::new_inclusive(0u8, 255u8),
+            Uniform::new_inclusive(0u8, 255u8).unwrap(),
             &mut rng,
         );
 

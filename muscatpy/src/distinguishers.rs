@@ -65,7 +65,7 @@ pub fn compute_cpa<'py>(
         ($($ty:ty),*) => {
             $(
                 if sample_dtype.is_equiv_to(&dtype::<$ty>(traces.py())) {
-                    let traces = traces.downcast::<PyArray2<$ty>>()?;
+                    let traces = traces.cast::<PyArray2<$ty>>()?;
 
                     return Ok(Cpa(muscat::distinguishers::cpa::cpa(
                         traces.readonly().as_array(),
@@ -154,7 +154,7 @@ impl CpaProcessor {
                                 .downcast_mut::<::muscat::distinguishers::cpa::CpaProcessor<$ty>>()
                                 .unwrap();
 
-                        let trace_batch = trace_batch.downcast::<PyArray2<$ty>>()?;
+                        let trace_batch = trace_batch.cast::<PyArray2<$ty>>()?;
 
                         cpa_processor.batch_update(
                             trace_batch.readonly().as_array(),
@@ -234,7 +234,7 @@ pub fn compute_cpa_normal<'py>(
         ($($ty:ty),*) => {
             $(
                 if sample_dtype.is_equiv_to(&dtype::<$ty>(traces.py())) {
-                    let traces = traces.downcast::<PyArray2<$ty>>()?;
+                    let traces = traces.cast::<PyArray2<$ty>>()?;
 
                     return Ok(Cpa(muscat::distinguishers::cpa_normal::cpa(
                         traces.readonly().as_array(),
@@ -323,7 +323,7 @@ impl CpaNormalProcessor {
                                 .downcast_mut::<::muscat::distinguishers::cpa_normal::CpaProcessor<$ty>>()
                                 .unwrap();
 
-                        let trace_batch = trace_batch.downcast::<PyArray2<$ty>>()?;
+                        let trace_batch = trace_batch.cast::<PyArray2<$ty>>()?;
 
                         cpa_processor.batch_update(
                             trace_batch.readonly().as_array(),
@@ -424,7 +424,7 @@ pub fn compute_dpa<'py>(
         ($($ty:ty),*) => {
             $(
                 if sample_dtype.is_equiv_to(&dtype::<$ty>(traces.py())) {
-                    let traces = traces.downcast::<PyArray2<$ty>>()?;
+                    let traces = traces.cast::<PyArray2<$ty>>()?;
 
                     return Ok(Dpa(muscat::distinguishers::dpa::dpa(
                         traces.readonly().as_array(),
@@ -512,7 +512,7 @@ impl DpaProcessor {
                                 .downcast_mut::<::muscat::distinguishers::dpa::DpaProcessor<$ty, usize>>()
                                 .unwrap();
 
-                        let trace_batch = trace_batch.downcast::<PyArray2<$ty>>()?;
+                        let trace_batch = trace_batch.cast::<PyArray2<$ty>>()?;
 
                         dpa_processor.batch_update(
                             trace_batch.readonly().as_array(),

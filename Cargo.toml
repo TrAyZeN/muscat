@@ -1,7 +1,7 @@
 [package]
 name = "muscat"
 description = "Multithreaded Side Channel Attacks Tool"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Ledger-Donjon/muscat"
@@ -20,26 +20,26 @@ quicklog = []
 
 [dependencies]
 # Public dependencies
-ndarray = { version = "0.16.1", features = ["serde"] }
+ndarray = { version = "0.17.1", features = ["serde"] }
 serde = { version = "1.0.214", features = ["derive"] }
 
 # Private dependencies
 serde_json = "1.0.132"
 hex = "0.4.3"
 npyz = "0.8.3"
-rayon = "1.10.0"
+rayon = "1.11.0"
 indicatif = { version = "0.17.8", optional = true }
-itertools = "0.13.0"
-thiserror = "1.0.58"
+itertools = "0.14.0"
+thiserror = "2.0.17"
 dtw = "0.1.0"
 num-traits = "0.2.19"
 
 [dev-dependencies]
-criterion = "0.5.1"
-ndarray-rand = "0.15.0"
-gnuplot = "0.0.45"
-anyhow = "1.0.98"
-ndarray-npy = "0.9.1"
+criterion = "0.8.1"
+ndarray-rand = "0.16.0"
+gnuplot = "0.0.46"
+anyhow = "1.0.100"
+ndarray-npy = "0.10.0"
 
 [[example]]
 name = "cpa"

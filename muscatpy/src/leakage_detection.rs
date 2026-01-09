@@ -37,7 +37,7 @@ pub fn compute_snr<'py>(
         ($($ty:ty),*) => {
             $(
                 if sample_dtype.is_equiv_to(&dtype::<$ty>(traces.py())) {
-                    let traces = traces.downcast::<PyArray2<$ty>>()?;
+                    let traces = traces.cast::<PyArray2<$ty>>()?;
 
                     return Ok(muscat::leakage_detection::snr(
                         traces.readonly().as_array(),
@@ -86,7 +86,7 @@ pub fn compute_nicv<'py>(
         ($($ty:ty),*) => {
             $(
                 if sample_dtype.is_equiv_to(&dtype::<$ty>(traces.py())) {
-                    let traces = traces.downcast::<PyArray2<$ty>>()?;
+                    let traces = traces.cast::<PyArray2<$ty>>()?;
 
                     return Ok(muscat::leakage_detection::nicv(
                         traces.readonly().as_array(),
@@ -125,7 +125,7 @@ pub fn compute_ttest<'py>(
         ($($ty:ty),*) => {
             $(
                 if sample_dtype.is_equiv_to(&dtype::<$ty>(traces.py())) {
-                    let traces = traces.downcast::<PyArray2<$ty>>()?;
+                    let traces = traces.cast::<PyArray2<$ty>>()?;
 
                     return Ok(muscat::leakage_detection::ttest(
                         traces.readonly().as_array(),

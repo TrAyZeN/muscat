@@ -25,7 +25,7 @@ pub fn compute_mean<'py>(
         ($($ty:ty),*) => {
             $(
                 if sample_dtype.is_equiv_to(&dtype::<$ty>(traces.py())) {
-                    let traces = traces.downcast::<PyArray2<$ty>>()?;
+                    let traces = traces.cast::<PyArray2<$ty>>()?;
 
                     let traces_ro = traces.readonly();
                     let traces = traces_ro.as_array();
@@ -67,7 +67,7 @@ pub fn compute_var<'py>(
         ($($ty:ty),*) => {
             $(
                 if sample_dtype.is_equiv_to(&dtype::<$ty>(traces.py())) {
-                    let traces = traces.downcast::<PyArray2<$ty>>()?;
+                    let traces = traces.cast::<PyArray2<$ty>>()?;
 
                     let traces_ro = traces.readonly();
                     let traces = traces_ro.as_array();

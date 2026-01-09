@@ -3,7 +3,7 @@ use muscat::leakage_detection::{TTestProcessor, ttest};
 use ndarray::{Array1, Array2};
 use ndarray_rand::RandomExt;
 use ndarray_rand::rand::{SeedableRng, rngs::StdRng};
-use ndarray_rand::rand_distr::{Standard, Uniform};
+use ndarray_rand::rand_distr::{StandardUniform, Uniform};
 
 fn ttest_sequential(traces: &Array2<i64>, trace_classes: &Array1<bool>) -> Array1<f32> {
     let mut ttest = TTestProcessor::new(traces.shape()[1]);
@@ -28,8 +28,12 @@ fn bench_ttest(c: &mut Criterion) {
     group.measurement_time(std::time::Duration::from_secs(60));
 
     for num_traces in [5000, 10000, 25000].into_iter() {
-        let traces = Array2::random_using((num_traces, 5000), Uniform::new(-200, 200), &mut rng);
-        let plaintexts = Array1::random_using(num_traces, Standard, &mut rng);
+        let traces = Array2::random_using(
+            (num_traces, 5000),
+            Uniform::new(-200, 200).unwrap(),
+            &mut rng,
+        );
+        let plaintexts = Array1::random_using(num_traces, StandardUniform, &mut rng);
 
         group.bench_with_input(
             BenchmarkId::new("sequential", num_traces),
