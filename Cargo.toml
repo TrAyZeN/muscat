@@ -19,10 +19,14 @@ progress_bar = ["dep:indicatif"]
 quicklog = []
 
 [dependencies]
+# Public dependencies
+ndarray = { version = "0.16.1", features = ["serde"] }
+serde = { version = "1.0.214", features = ["derive"] }
+
+# Private dependencies
 serde_json = "1.0.132"
 hex = "0.4.3"
 npyz = "0.8.3"
-ndarray = { version = "0.16.1", features = ["serde"] }
 rayon = "1.10.0"
 indicatif = { version = "0.17.8", optional = true }
 ndarray-npy = "0.9.1"
@@ -30,7 +34,6 @@ itertools = "0.13.0"
 thiserror = "1.0.58"
 dtw = "0.1.0"
 num-traits = "0.2.19"
-serde = { version = "1.0.214", features = ["derive"] }
 
 [dev-dependencies]
 criterion = "0.5.1"

@@ -67,6 +67,10 @@
 //! # Performance
 //! To get the best performance out of muscat, it is recommended to compile in release mode.
 
+// Re-export public dependencies
+pub use ndarray;
+pub use serde;
+
 pub mod asymmetric;
 pub mod distinguishers;
 pub mod error;
