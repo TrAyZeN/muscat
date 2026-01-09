@@ -15,14 +15,13 @@
 //! - Elastic alignment
 //!
 //! # Getting started
-//! Here is an example of how to use the CPA processor to recover the first byte of the key:
+//! Here is an example of how to use the CPA processor to recover the first byte of the AES key of the given traces:
 //! ```rust
 //! use ndarray::array;
 //! use std::iter::zip;
 //!
 //! use muscat::distinguishers::cpa::CpaProcessor;
 //! use muscat::leakage_model::aes::sbox;
-//! use muscat::trace::Trace;
 //!
 //! let traces = array![
 //!     [77u8, 137, 51, 91],
